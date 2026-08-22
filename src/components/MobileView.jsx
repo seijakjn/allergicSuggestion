@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { Shield, User, Smartphone, RefreshCw, CheckCircle, Flame, Leaf, Candy, HelpCircle } from 'lucide-react';
-
-const MENU_ITEMS = [
-  { id: 1, name: "Smoked Truffle Edamame", description: "Truffle oil & smoked sea salt.", price: 250.00, allergens: ["soy"], tags: ["vegan"] },
-  { id: 2, name: "Spicy Szechuan Dumplings", description: "Pork dumplings in fiery chili oil.", price: 380.00, allergens: ["soy", "gluten"], tags: ["spicy"] },
-  { id: 3, name: "Crispy Szechuan Tofu Bites", description: "Crisp tofu with five-spice pepper.", price: 320.00, allergens: ["soy"], tags: ["spicy", "vegan"] },
-  { id: 4, name: "Creamy Garlic Parmesan Pasta", description: "Fettuccine in rich garlic cream.", price: 580.00, allergens: ["dairy", "gluten"], tags: [] },
-  { id: 5, name: "Thai Coconut Curry Bowl", description: "Aromatic curry with vegetables & rice.", price: 490.00, allergens: [], tags: ["vegan", "spicy"] },
-  { id: 6, name: "Honey Glazed Peanut Noodles", description: "Peanut butter sauce & soy glaze.", price: 420.00, allergens: ["peanuts", "soy", "gluten"], tags: ["sweet"] },
-  { id: 7, name: "Molten Chocolate Lava Cake", description: "Molten center with raspberry coulis.", price: 300.00, allergens: ["dairy", "gluten"], tags: ["sweet"] },
-  { id: 8, name: "Mango Sticky Rice", description: "Sweet coconut rice with fresh mango.", price: 280.00, allergens: [], tags: ["vegan", "sweet"] }
-];
+// MENU_ITEMS is now loaded dynamically from the backend API /api/menu
 
 const ALLERGEN_OPTIONS = [
   { id: 'peanuts', label: 'Peanuts' },
@@ -53,6 +43,31 @@ function MobileView({ kioskId, onResetSession }) {
     return saved ? JSON.parse(saved) : null;
   });
   const socketRef = useRef(null);
+
+  const [menuItems, setMenuItems] = useState([]);
+  const [captiveParams, setCaptiveParams] = useState(null);
+
+  // Load menu items dynamically from API
+  useEffect(() => {
+    fetch('/api/menu')
+      .then(res => res.json())
+      .then(data => setMenuItems(data))
+      .catch(err => console.error("Error loading menu:", err));
+  }, []);
+
+  // Check for OpenNDS captive portal parameters in URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tok = params.get('tok');
+    const gatewayaddress = params.get('gatewayaddress');
+    const clientmac = params.get('clientmac');
+    const redir = params.get('redir');
+
+    if (tok && gatewayaddress) {
+      setCaptiveParams({ tok, gatewayaddress, clientmac, redir });
+    }
+  }, []);
+
 
   // Sync state to localStorage on changes
   useEffect(() => {
@@ -130,7 +145,7 @@ function MobileView({ kioskId, onResetSession }) {
       return;
     }
 
-    const orderedItem = MENU_ITEMS.find(item => item.id === selectedItemId);
+    const orderedItem = menuItems.find(item => item.id === selectedItemId);
     if (!orderedItem) return;
 
     // 1. Update local user history with ordered food item tags to fine-tune preferences
@@ -170,7 +185,7 @@ function MobileView({ kioskId, onResetSession }) {
   };
 
   // Safe foods filtering (Mobile list)
-  const safeItems = MENU_ITEMS.filter(item => {
+  const safeItems = menuItems.filter(item => {
     return !item.allergens.some(a => allergens.includes(a));
   });
 
@@ -386,6 +401,47 @@ function MobileView({ kioskId, onResetSession }) {
         /* VIEW 1: PROFILE SETUP / ONBOARDING VIEW */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
+          {/* Captive Portal Activation Banner */}
+          {captiveParams && (
+            <div className="glass-card highlighted" style={{ padding: '20px', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ background: 'rgba(45, 106, 79, 0.08)', padding: '8px', borderRadius: '10px', color: 'var(--accent-green)' }}>
+                  <Shield size={20} />
+                </div>
+                <div>
+                  <h5 style={{ fontSize: '15px', fontWeight: '700' }}>Restaurant Wi-Fi Connected</h5>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                    Device MAC: {captiveParams.clientmac || 'Unknown'}
+                  </span>
+                </div>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '16px' }}>
+                To unlock full internet access on this network, authenticate your device. Your dietary preferences will remain secure and private.
+              </p>
+              <button
+                onClick={() => {
+                  // Redirect client to opennds authentication URL (mock or real)
+                  const authUrl = `http://${captiveParams.gatewayaddress}/opennds_auth/?tok=${captiveParams.tok}&redir=${encodeURIComponent(captiveParams.redir || window.location.origin)}`;
+                  window.location.href = authUrl;
+                }}
+                className="btn-primary"
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  fontSize: '13px', 
+                  borderRadius: '10px', 
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                Connect to Guest Wi-Fi
+              </button>
+            </div>
+          )}
+
           {/* Quick Repeat Last Order Card */}
           {lastOrder && (
             <div className="glass-card" style={{ padding: '16px', background: 'rgba(245, 166, 35, 0.04)', borderColor: 'rgba(245, 166, 35, 0.25)', borderRadius: '16px' }}>

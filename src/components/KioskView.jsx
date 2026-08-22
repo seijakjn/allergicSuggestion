@@ -2,17 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
 import { Monitor, Smartphone, Check, ShieldCheck, Clock, EyeOff, UtensilsCrossed, AlertTriangle } from 'lucide-react';
-
-const MASTER_MENU = [
-  { id: 1, name: "Smoked Truffle Edamame", description: "Steamed edamame tossed in white truffle oil and smoked sea salt.", price: 250.00, allergens: ["soy"], tags: ["vegan"] },
-  { id: 2, name: "Spicy Szechuan Dumplings", description: "Pork dumplings in a fiery chili oil broth and toasted sesame.", price: 380.00, allergens: ["soy", "gluten"], tags: ["spicy"] },
-  { id: 3, name: "Crispy Szechuan Tofu Bites", description: "Crisp tofu tossed in spicy five-spice pepper seasoning.", price: 320.00, allergens: ["soy"], tags: ["spicy", "vegan"] },
-  { id: 4, name: "Creamy Garlic Parmesan Pasta", description: "Fettuccine in a rich parmesan cream sauce with roasted garlic.", price: 580.00, allergens: ["dairy", "gluten"], tags: [] },
-  { id: 5, name: "Thai Coconut Curry Bowl", description: "Aromatic red curry with coconut milk, lemongrass, jasmine rice, and vegetables.", price: 490.00, allergens: [], tags: ["vegan", "spicy"] },
-  { id: 6, name: "Honey Glazed Peanut Noodles", description: "Warm noodles tossed in a sweet peanut butter sauce with soy glaze.", price: 420.00, allergens: ["peanuts", "soy", "gluten"], tags: ["sweet"] },
-  { id: 7, name: "Molten Chocolate Lava Cake", description: "Warm dark chocolate cake with a molten center and raspberry coulis.", price: 300.00, allergens: ["dairy", "gluten"], tags: ["sweet"] },
-  { id: 8, name: "Mango Sticky Rice", description: "Sweet glutinous rice cooked in coconut cream, served with fresh mango slices.", price: 280.00, allergens: [], tags: ["vegan", "sweet"] }
-];
+// MASTER_MENU is now fetched dynamically from /api/menu
 
 function generateKioskId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -29,6 +19,17 @@ function KioskView() {
   
   const socketRef = useRef(null);
   const countdownIntervalRef = useRef(null);
+
+  const [masterMenu, setMasterMenu] = useState([]);
+
+  // Load menu items from API
+  useEffect(() => {
+    fetch('/api/menu')
+      .then(res => res.json())
+      .then(data => setMasterMenu(data))
+      .catch(err => console.error("Error loading menu:", err));
+  }, []);
+
 
   // Initialize Socket.io Connection
   useEffect(() => {
@@ -135,7 +136,7 @@ function KioskView() {
 
   // Filtering and Sorting Menu Items
   // 1. Filter out items containing user allergens
-  const filteredMenu = MASTER_MENU.filter(item => {
+  const filteredMenu = masterMenu.filter(item => {
     return !item.allergens.some(allergen => allergens.includes(allergen));
   });
 
